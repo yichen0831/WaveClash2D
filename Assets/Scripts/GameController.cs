@@ -1,16 +1,16 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Networking;
 
-public class GameController : MonoBehaviour
+public class GameController : NetworkBehaviour
 {
     // Singleton.
     public static GameController Instance { get; private set; }
 
-    public Fighter fighterPrefab;
-    public GameObject[] bodyPrefabs;
-    public Wave wavePrefab;
-    public Dictionary<string, GameObject> bodyDict = new Dictionary<string, GameObject>();
+    private ResourceManager resourceManager;
+
+    private int selectedFighter;
 
     void Awake()
     {
@@ -23,16 +23,11 @@ public class GameController : MonoBehaviour
             Destroy(gameObject);
             return;
         }
-
-        foreach (var body in bodyPrefabs)
-        {
-            var name = body.name.Substring(0, body.name.IndexOf("Body"));
-            bodyDict.Add(name, body);
-        }
     }
 
     void Start()
     {
+        resourceManager = ResourceManager.Instance;
     }
 
     void Update()
@@ -40,17 +35,24 @@ public class GameController : MonoBehaviour
 
     }
 
+    [Server]
     public void RegisterPlayer(PlayerController playerController)
     {
-        if (playerController.selectedFighter < 0 || playerController.selectedFighter >= bodyPrefabs.Length)
-        {
-            Debug.LogError("Fighter selection error: selected " + playerController.selectedFighter);
-            return;
-        }
+        //selectedFighter = playerController.selectedFighter;
+        //if (playerController.selectedFighter < 0 || playerController.selectedFighter >= bodyPrefabs.Length)
+        //{
+        //    Debug.LogError("Fighter selection error: selected " + playerController.selectedFighter);
+        //    selectedFighter = 0;
+        //}
 
-        var fighter = Instantiate(fighterPrefab) as Fighter;
-        fighter.Setup(bodyPrefabs[playerController.selectedFighter]);
+        selectedFighter = (selectedFighter + 1) % resourceManager.bodyPrefabs.Length;
+
+        var fighter = Instantiate(resourceManager.fighterPrefab) as Fighter;
+        fighter.transform.localPosition = new Vector3(0f, -1f, 0f);
+        fighter.Setup(selectedFighter, playerController);
+        NetworkServer.Spawn(fighter.gameObject);
 
         playerController.controllingFighter = fighter;
+        playerController.RegisterDone();
     }
 }

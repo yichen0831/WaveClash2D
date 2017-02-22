@@ -1,0 +1,18 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!221 &22100000
+AnimatorOverrideController:
+  m_ObjectHideFlags: 0
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 0}
+  m_Name: AdvantureGirlAOC
+  m_Controller: {fileID: 9100000, guid: 0864f4e61e0ab01479a0fadff98f0f43, type: 2}
+  m_Clips:
+  - m_OriginalClip: {fileID: 7400000, guid: 486fa05e9fcd8e445b33ce24ae5e7e37, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: 44e2eb7dcc9e4934a9a7a48f1de44a3d, type: 2}
+  - m_OriginalClip: {fileID: 7400000, guid: 4ba6c908ac51b8649bb432a0e3a80262, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: 6e5fa9991a7df17449d947a979ed3b14, type: 2}
+  - m_OriginalClip: {fileID: 7400000, guid: 66e451b3313a5a44cbb180921afb9b65, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: e1d1241a6c78c644b901fbe90a9b6e86, type: 2}
+  - m_OriginalClip: {fileID: 7400000, guid: 1b21a17b544b38a419ba8c0b16f90fd5, type: 2}
+    m_OverrideClip: {fileID: 7400000, guid: c1fef0bcfb5084c45b292804d987b6bc, type: 2}
