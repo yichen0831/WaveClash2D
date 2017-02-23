@@ -22,6 +22,9 @@ public class Fighter : NetworkBehaviour
 
     private float verticalSpeed = 0f;
 
+    [SyncVar]
+    private bool facingRight;
+
     private bool grounded;
     private bool jumping;
 
@@ -47,6 +50,13 @@ public class Fighter : NetworkBehaviour
 
         grounded = true;
         jumping = false;
+
+        facingRight = true;
+
+        if (isClient && !isServer)
+        {
+            myCollider.isTrigger = true;
+        }
     }
 
     void Update()
@@ -64,6 +74,15 @@ public class Fighter : NetworkBehaviour
                 {
                     NetworkServer.Destroy(gameObject);
                 }
+            }
+
+            if (rb.velocity.x > 0)
+            {
+                facingRight = true;
+            }
+            else if (rb.velocity.x < 0)
+            {
+                facingRight = false;
             }
         }
 
@@ -119,10 +138,11 @@ public class Fighter : NetworkBehaviour
 
                 if (!Pushed)
                 {
-                    if ((spriteRenderer.flipX && rb.velocity.x > 0) || (!spriteRenderer.flipX && rb.velocity.x < 0))
-                    {
-                        spriteRenderer.flipX = !spriteRenderer.flipX;
-                    }
+                    spriteRenderer.flipX = !facingRight;
+                    // if ((spriteRenderer.flipX && rb.velocity.x > 0) || (!spriteRenderer.flipX && rb.velocity.x < 0))
+                    // {
+                    //     spriteRenderer.flipX = !spriteRenderer.flipX;
+                    // }
 
                     if (rb.velocity.sqrMagnitude > 1f)
                     {
@@ -142,6 +162,13 @@ public class Fighter : NetworkBehaviour
             if (Pushed)
             {
                 animator.SetBool("Run", false);
+            }
+        }
+        else
+        {
+            if (!Pushed)
+            {
+                rb.drag = 0f;
             }
         }
     }
@@ -237,7 +264,6 @@ public class Fighter : NetworkBehaviour
 
         // Set gravity for falling.
         rb.gravityScale = 2f;
-        rb.drag = 0f;
     }
 
     private void OnTriggerEnter2D(Collider2D collider2D)
@@ -263,6 +289,9 @@ public class Fighter : NetworkBehaviour
             rb.gravityScale = 0;
             rb.velocity = Vector2.zero;
             transform.localPosition = new Vector3(0f, -1f, 0f);
+
+            myCollider.isTrigger = false;
+
             RpcReset();
         }
     }
@@ -282,8 +311,6 @@ public class Fighter : NetworkBehaviour
 
         attackingCountDown = 0f;
         pushedCountDown = 0f;
-
-        myCollider.isTrigger = false;
 
         spriteRenderer.sortingLayerName = "Foreground";
 
