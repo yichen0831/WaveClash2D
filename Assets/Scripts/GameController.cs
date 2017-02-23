@@ -28,6 +28,7 @@ public class GameController : NetworkBehaviour
     void Start()
     {
         resourceManager = ResourceManager.Instance;
+        selectedFighter = 0;
     }
 
     void Update()
@@ -45,8 +46,6 @@ public class GameController : NetworkBehaviour
         //    selectedFighter = 0;
         //}
 
-        selectedFighter = (selectedFighter + 1) % resourceManager.bodyPrefabs.Length;
-
         var fighter = Instantiate(resourceManager.fighterPrefab) as Fighter;
         fighter.transform.localPosition = new Vector3(0f, -1f, 0f);
         fighter.Setup(selectedFighter, playerController);
@@ -54,5 +53,7 @@ public class GameController : NetworkBehaviour
 
         playerController.controllingFighter = fighter;
         playerController.RegisterDone();
+
+        selectedFighter = (selectedFighter + 1) % resourceManager.bodyPrefabs.Length;
     }
 }

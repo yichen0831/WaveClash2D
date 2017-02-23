@@ -30,14 +30,4 @@ public class ResourceManager : MonoBehaviour
             bodyDict.Add(name, body);
         }
     }
-
-    void Start()
-    {
-
-    }
-
-    void Update()
-    {
-
-    }
 }
