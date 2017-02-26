@@ -31,11 +31,6 @@ public class GameController : NetworkBehaviour
         selectedFighter = 0;
     }
 
-    void Update()
-    {
-
-    }
-
     [Server]
     public void RegisterPlayer(PlayerController playerController)
     {

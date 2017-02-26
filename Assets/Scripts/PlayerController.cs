@@ -68,12 +68,22 @@ public class PlayerController : NetworkBehaviour
     [Command]
     void CmdSetVelocity(float x, float y)
     {
+        if (controllingFighter == null)
+        {
+            return;
+        }
+
         controllingFighter.SetVelocity(x, y);
     }
 
     [Command]
     void CmdJump()
     {
+        if (controllingFighter == null)
+        {
+            return;
+        }
+
         controllingFighter.Jump();
     }
 }

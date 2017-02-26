@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -6,6 +7,16 @@ using UnityEngine.Networking;
 [RequireComponent(typeof(Rigidbody2D))]
 public class Fighter : NetworkBehaviour
 {
+    enum Status
+    {
+        Idle,
+        Run,
+        Jump,
+        Attack,
+        GetPushed,
+        Fall
+    }
+
     public static readonly float gravity = -20f;
 
     [SyncVar]
@@ -13,6 +24,9 @@ public class Fighter : NetworkBehaviour
 
     public PlayerController playerController;
     public Transform shadow;
+
+    [SyncVar]
+    private Status currentStatus;
 
     private Rigidbody2D rb;
     private Collider2D myCollider;
@@ -26,7 +40,6 @@ public class Fighter : NetworkBehaviour
     private bool facingRight;
 
     private bool grounded;
-    private bool jumping;
 
     private bool falling;
 
@@ -49,7 +62,6 @@ public class Fighter : NetworkBehaviour
         CreateBody();
 
         grounded = true;
-        jumping = false;
 
         facingRight = true;
 
@@ -61,8 +73,12 @@ public class Fighter : NetworkBehaviour
 
     void Update()
     {
+        CheckInAir();
+
+        // Server is in charge of logic.
         if (isServer)
         {
+            // Check if the player who controls is disconnected.
             if (playerControllerCheckCountDown > 0f)
             {
                 playerControllerCheckCountDown -= Time.deltaTime;
@@ -70,107 +86,153 @@ public class Fighter : NetworkBehaviour
             else
             {
                 playerControllerCheckCountDown = 1f;
+                // If the player in charge is disconnected, destroy self.
                 if (playerController == null)
                 {
                     NetworkServer.Destroy(gameObject);
                 }
             }
 
-            if (rb.velocity.x > 0)
+            switch (currentStatus)
             {
-                facingRight = true;
+                case Status.Idle:
+                    rb.drag = 10f;
+                    break;
+                case Status.Run:
+                    rb.drag = 10f;
+
+                    if (rb.velocity.x > 0)
+                    {
+                        facingRight = true;
+                    }
+                    else if (rb.velocity.x < 0)
+                    {
+                        facingRight = false;
+                    }
+
+                    if (rb.velocity.sqrMagnitude < 1f)
+                    {
+                        currentStatus = Status.Idle;
+                    }
+                    break;
+                case Status.Jump:
+                    rb.drag = 1.8f;
+
+                    if (body.localPosition.y <= 0)
+                    {
+                        grounded = true;
+
+                        if (canAttack)
+                        {
+                            canAttack = false;
+                            attackingCountDown = 0.36f;
+                            var wave = Instantiate(ResourceManager.Instance.wavePrefab) as Wave;
+                            wave.caster = this;
+                            wave.transform.localPosition = transform.localPosition;
+                            RpcCreateWave(transform.localPosition);
+                            currentStatus = Status.Attack;
+                        }
+                    }
+                    break;
+                case Status.Attack:
+                    rb.drag = 10f;
+                    if (Attacking)
+                    {
+                        attackingCountDown -= Time.deltaTime;
+                    }
+                    else
+                    {
+                        currentStatus = Status.Idle;
+                    }
+                    break;
+                case Status.GetPushed:
+                    rb.drag = 10f;
+                    if (Pushed)
+                    {
+                        pushedCountDown -= Time.deltaTime;
+                    }
+                    else
+                    {
+                        currentStatus = Status.Idle;
+                    }
+                    break;
+                case Status.Fall:
+                    rb.drag = 0f;
+                    break;
+                default:
+                    break;
             }
-            else if (rb.velocity.x < 0)
-            {
-                facingRight = false;
-            }
         }
 
-        if (Attacking)
-        {
-            attackingCountDown -= Time.deltaTime;
-        }
-
-        if (Pushed)
-        {
-            pushedCountDown -= Time.deltaTime;
-        }
-
-        if (!falling)
+        // Animations.
+        if (currentStatus != Status.Fall)
         {
             spriteRenderer.sortingOrder = (int)(transform.localPosition.y * -100);
-
-            verticalSpeed += gravity * Time.deltaTime;
-
-            var localPosition = body.localPosition;
-
-            localPosition.y += verticalSpeed * Time.deltaTime;
-
-            if (localPosition.y <= 0)
-            {
-                localPosition.y = 0;
-                grounded = true;
-
-                if (jumping)
-                {
-                    jumping = false;
-                    animator.SetBool("Jump", false);
-                }
-
-                if (canAttack)
-                {
-                    canAttack = false;
-                    attackingCountDown = 0.36f;
-                    var wave = Instantiate(ResourceManager.Instance.wavePrefab) as Wave;
-                    wave.caster = this;
-                    wave.transform.localPosition = transform.localPosition;
-                }
-            }
-
-            shadow.localScale = Vector3.one * ((5f - localPosition.y) / 5f);
-
-            body.localPosition = localPosition;
-
-            // Check facing direction.
-            if (grounded)
-            {
-                rb.drag = 10f;
-
-                if (!Pushed)
-                {
-                    spriteRenderer.flipX = !facingRight;
-                    // if ((spriteRenderer.flipX && rb.velocity.x > 0) || (!spriteRenderer.flipX && rb.velocity.x < 0))
-                    // {
-                    //     spriteRenderer.flipX = !spriteRenderer.flipX;
-                    // }
-
-                    if (rb.velocity.sqrMagnitude > 1f)
-                    {
-                        animator.SetBool("Run", true);
-                    }
-                    else if (rb.velocity.sqrMagnitude < 0.3f)
-                    {
-                        animator.SetBool("Run", false);
-                    }
-                }
-            }
-            else
-            {
-                rb.drag = 1.6f;
-            }
-
-            if (Pushed)
-            {
-                animator.SetBool("Run", false);
-            }
         }
-        else
+
+        spriteRenderer.flipX = !facingRight;
+
+        switch (currentStatus)
         {
-            if (!Pushed)
-            {
-                rb.drag = 0f;
-            }
+            case Status.Idle:
+                animator.SetBool("Run", false);
+                animator.SetBool("Jump", false);
+                animator.SetBool("Fall", false);
+                break;
+            case Status.Run:
+                animator.SetBool("Run", true);
+                break;
+            case Status.Jump:
+                animator.SetBool("Jump", true);
+                break;
+            case Status.Attack:
+                animator.SetBool("Run", false);
+                animator.SetBool("Jump", false);
+                animator.SetBool("Fall", false);
+                break;
+            case Status.GetPushed:
+                animator.SetBool("Run", false);
+                animator.SetBool("Jump", false);
+                animator.SetBool("Fall", false);
+                break;
+            case Status.Fall:
+                animator.SetBool("Fall", true);
+                break;
+            default:
+                break;
         }
+    }
+
+    private void CheckInAir()
+    {
+        if (body.localPosition.y > 0f || verticalSpeed > 0f)
+        {
+            verticalSpeed += gravity * Time.deltaTime;
+            var tmpBodyLocalPosition = body.localPosition;
+            tmpBodyLocalPosition.y += verticalSpeed * Time.deltaTime;
+
+            if (tmpBodyLocalPosition.y <= 0f)
+            {
+                tmpBodyLocalPosition.y = 0f;
+                verticalSpeed = 0f;
+            }
+
+            body.localPosition = tmpBodyLocalPosition;
+            shadow.localScale = Vector3.one * ((5f - body.localPosition.y) / 5f);
+        }
+    }
+
+    [ClientRpc]
+    private void RpcCreateWave(Vector3 localPosition)
+    {
+        if (isServer)
+        {
+            return;
+        }
+
+        var wave = Instantiate(ResourceManager.Instance.wavePrefab) as Wave;
+        wave.caster = this;
+        wave.transform.localPosition = transform.localPosition;
     }
 
     [Server]
@@ -196,6 +258,7 @@ public class Fighter : NetworkBehaviour
     {
         if (CanAct && grounded)
         {
+            currentStatus = Status.Run;
             rb.velocity = new Vector2(x, y);
         }
     }
@@ -205,6 +268,11 @@ public class Fighter : NetworkBehaviour
     {
         if (CanAct && grounded)
         {
+            canAttack = true;
+            grounded = false;
+            verticalSpeed = 7.2f;
+
+            currentStatus = Status.Jump;
             RpcJump();
         }
     }
@@ -212,12 +280,7 @@ public class Fighter : NetworkBehaviour
     [ClientRpc]
     private void RpcJump()
     {
-        canAttack = true;
-
-        grounded = false;
-        jumping = true;
         verticalSpeed = 7.2f;
-        animator.SetBool("Jump", true);
     }
 
     private void OnTriggerExit2D(Collider2D collider2D)
@@ -234,6 +297,14 @@ public class Fighter : NetworkBehaviour
                 return;
             }
 
+            falling = true;
+            myCollider.isTrigger = true;
+
+            currentStatus = Status.Fall;
+
+            // Set gravity for falling.
+            rb.gravityScale = 2f;
+
             // Out of ring.
             RpcFall();
         }
@@ -242,12 +313,7 @@ public class Fighter : NetworkBehaviour
     [ClientRpc]
     private void RpcFall()
     {
-        falling = true;
         myCollider.isTrigger = true;
-
-        animator.SetBool("Jump", false);
-        animator.SetBool("Run", false);
-        animator.SetBool("Fall", true);
 
         if (transform.localPosition.y > -1f)
         {
@@ -262,8 +328,6 @@ public class Fighter : NetworkBehaviour
         // Turn of the shadow.
         shadow.gameObject.SetActive(false);
 
-        // Set gravity for falling.
-        rb.gravityScale = 2f;
     }
 
     private void OnTriggerEnter2D(Collider2D collider2D)
@@ -292,40 +356,9 @@ public class Fighter : NetworkBehaviour
 
             myCollider.isTrigger = false;
 
+            Reset();
             RpcReset();
         }
-    }
-
-    [ClientRpc]
-    private void RpcReset()
-    {
-        Reset();
-    }
-
-    public void Reset()
-    {
-        grounded = true;
-        jumping = false;
-        falling = false;
-        canAttack = false;
-
-        attackingCountDown = 0f;
-        pushedCountDown = 0f;
-
-        spriteRenderer.sortingLayerName = "Foreground";
-
-        verticalSpeed = 0;
-
-        body.localPosition = Vector3.zero;
-
-        animator.SetBool("Run", false);
-        animator.SetBool("Jump", false);
-        animator.SetBool("Fall", false);
-
-        // Turn on the shadow.
-        shadow.gameObject.SetActive(true);
-
-        ResourceManager.Instance.arena.ActivateAnimation();
     }
 
     private void OnTriggerStay2D(Collider2D collider2D)
@@ -338,9 +371,10 @@ public class Fighter : NetworkBehaviour
         if (collider2D.CompareTag("Wave"))
         {
             var wave = collider2D.GetComponent<Wave>();
-            if (Pushed && wave.caster != this)
+            if (currentStatus != Status.Fall && Pushed && wave.caster != this)
             {
                 pushedCountDown = 0.1f;
+                currentStatus = Status.GetPushed;
 
                 // Add force.
                 var relativeVec = transform.position - collider2D.transform.position;
@@ -349,5 +383,43 @@ public class Fighter : NetworkBehaviour
                 rb.AddForce(dir * (Mathf.Max(2.5f - distance, 0.5f)), ForceMode2D.Impulse);
             }
         }
+    }
+
+
+    [ClientRpc]
+    private void RpcReset()
+    {
+        if (isServer)
+        {
+            return;
+        }
+
+        Reset();
+    }
+
+    public void Reset()
+    {
+        grounded = true;
+        falling = false;
+        canAttack = false;
+
+        attackingCountDown = 0f;
+        pushedCountDown = 0f;
+
+        spriteRenderer.sortingLayerName = "Foreground";
+
+        verticalSpeed = 0;
+
+        body.localPosition = Vector3.zero;
+
+        currentStatus = Status.Idle;
+        animator.SetBool("Run", false);
+        animator.SetBool("Jump", false);
+        animator.SetBool("Fall", false);
+
+        // Turn on the shadow.
+        shadow.gameObject.SetActive(true);
+
+        ResourceManager.Instance.arena.ActivateAnimation();
     }
 }
