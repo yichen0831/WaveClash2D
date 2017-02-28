@@ -17,14 +17,16 @@ public class PlayerController : NetworkBehaviour
     {
         if (isLocalPlayer)
         {
-            CmdRegisterPlayer();
+            string nickname = OperatingGui.Instance.GetNickname();
+            int fighterIndex = OperatingGui.Instance.GetFighterIndex();
+            CmdRegisterPlayer(nickname, fighterIndex);
         }
     }
 
     [Command]
-    void CmdRegisterPlayer()
+    void CmdRegisterPlayer(string nickname, int fighterIndex)
     {
-        GameController.Instance.RegisterPlayer(this);
+        GameController.Instance.RegisterPlayer(this, nickname, fighterIndex);
     }
 
     [Server]

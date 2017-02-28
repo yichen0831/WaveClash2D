@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
+using UnityEngine.UI;
 
 [RequireComponent(typeof(Rigidbody2D))]
 public class Fighter : NetworkBehaviour
@@ -20,13 +22,21 @@ public class Fighter : NetworkBehaviour
     public static readonly float gravity = -20f;
 
     [SyncVar]
+    public string nickname;
+
+    [SyncVar]
     private int selectedFighter;
 
     public PlayerController playerController;
     public Transform shadow;
+    public Text nameText;
+    public Text aliveText;
 
     [SyncVar]
     private Status currentStatus;
+
+    public float AliveTime { get; private set; }     // Alive time calculated on the server.
+    private float aliveTimeUpdatCountDown;
 
     private Rigidbody2D rb;
     private Collider2D myCollider;
@@ -47,16 +57,22 @@ public class Fighter : NetworkBehaviour
     private float attackingCountDown;
     public bool Attacking { get { return attackingCountDown > 0f; } }
 
-    [SyncVar]
     private float pushedCountDown;
     public bool Pushed { get { return pushedCountDown > 0f; } }
 
     public bool CanAct { get { return !falling && !Pushed && !Attacking; } }
 
     private float playerControllerCheckCountDown;
+    StringBuilder stringBuilder;
 
-    void Start()
+    public override void OnStartServer()
     {
+        GameController.Instance.RegisterFighter(this);
+    }
+
+    private void Start()
+    {
+        stringBuilder = new StringBuilder();
         rb = GetComponent<Rigidbody2D>();
         myCollider = GetComponent<CapsuleCollider2D>();
         CreateBody();
@@ -65,23 +81,36 @@ public class Fighter : NetworkBehaviour
 
         facingRight = true;
 
+        nameText.text = nickname;
+
         if (isClient && !isServer)
         {
             myCollider.isTrigger = true;
         }
     }
 
-    void Update()
+    private void Update()
     {
-        CheckInAir();
+        float deltaTime = Time.deltaTime;
+
+        CheckInAir(deltaTime);
 
         // Server is in charge of logic.
         if (isServer)
         {
+            AliveTime += deltaTime;
+
+            aliveTimeUpdatCountDown -= deltaTime;
+            if (aliveTimeUpdatCountDown <= 0)
+            {
+                aliveTimeUpdatCountDown = 0.1f;
+                RpcUpdateAliveTime(AliveTime);
+            }
+
             // Check if the player who controls is disconnected.
             if (playerControllerCheckCountDown > 0f)
             {
-                playerControllerCheckCountDown -= Time.deltaTime;
+                playerControllerCheckCountDown -= deltaTime;
             }
             else
             {
@@ -138,7 +167,7 @@ public class Fighter : NetworkBehaviour
                     rb.drag = 10f;
                     if (Attacking)
                     {
-                        attackingCountDown -= Time.deltaTime;
+                        attackingCountDown -= deltaTime;
                     }
                     else
                     {
@@ -149,7 +178,7 @@ public class Fighter : NetworkBehaviour
                     rb.drag = 10f;
                     if (Pushed)
                     {
-                        pushedCountDown -= Time.deltaTime;
+                        pushedCountDown -= deltaTime;
                     }
                     else
                     {
@@ -203,13 +232,13 @@ public class Fighter : NetworkBehaviour
         }
     }
 
-    private void CheckInAir()
+    private void CheckInAir(float deltaTime)
     {
         if (body.localPosition.y > 0f || verticalSpeed > 0f)
         {
-            verticalSpeed += gravity * Time.deltaTime;
+            verticalSpeed += gravity * deltaTime;
             var tmpBodyLocalPosition = body.localPosition;
-            tmpBodyLocalPosition.y += verticalSpeed * Time.deltaTime;
+            tmpBodyLocalPosition.y += verticalSpeed * deltaTime;
 
             if (tmpBodyLocalPosition.y <= 0f)
             {
@@ -236,10 +265,11 @@ public class Fighter : NetworkBehaviour
     }
 
     [Server]
-    public void Setup(int selectedFighter, PlayerController playerController)
+    public void Setup(int selectedFighter, PlayerController playerController, string nickname)
     {
         this.selectedFighter = selectedFighter;
         this.playerController = playerController;
+        this.nickname = nickname;
     }
 
     private void CreateBody()
@@ -330,6 +360,15 @@ public class Fighter : NetworkBehaviour
 
     }
 
+    [ClientRpc]
+    private void RpcUpdateAliveTime(float aliveTime)
+    {
+        // Update alive time on the GUI.
+        stringBuilder.Length = 0;
+        stringBuilder.AppendFormat("{0:0.0}", aliveTime);
+        aliveText.text = stringBuilder.ToString();
+    }
+
     private void OnTriggerEnter2D(Collider2D collider2D)
     {
         if (!isServer)
@@ -385,7 +424,6 @@ public class Fighter : NetworkBehaviour
         }
     }
 
-
     [ClientRpc]
     private void RpcReset()
     {
@@ -402,6 +440,8 @@ public class Fighter : NetworkBehaviour
         grounded = true;
         falling = false;
         canAttack = false;
+
+        AliveTime = 0f;
 
         attackingCountDown = 0f;
         pushedCountDown = 0f;
@@ -421,5 +461,13 @@ public class Fighter : NetworkBehaviour
         shadow.gameObject.SetActive(true);
 
         ResourceManager.Instance.arena.ActivateAnimation();
+    }
+
+    private void OnDestroy()
+    {
+        if (isServer)
+        {
+            GameController.Instance.RemoveFighter(this);
+        }
     }
 }
