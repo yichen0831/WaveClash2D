@@ -63,7 +63,6 @@ public class Fighter : NetworkBehaviour
     public bool CanAct { get { return !falling && !Pushed && !Attacking; } }
 
     private float playerControllerCheckCountDown;
-    StringBuilder stringBuilder;
 
     public override void OnStartServer()
     {
@@ -72,7 +71,6 @@ public class Fighter : NetworkBehaviour
 
     private void Start()
     {
-        stringBuilder = new StringBuilder();
         rb = GetComponent<Rigidbody2D>();
         myCollider = GetComponent<CapsuleCollider2D>();
         CreateBody();
@@ -364,7 +362,7 @@ public class Fighter : NetworkBehaviour
     private void RpcUpdateAliveTime(float aliveTime)
     {
         // Update alive time on the GUI.
-        stringBuilder.Length = 0;
+        var stringBuilder = new StringBuilder();
         stringBuilder.AppendFormat("{0:0.0}", aliveTime);
         aliveText.text = stringBuilder.ToString();
     }

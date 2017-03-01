@@ -25,6 +25,7 @@ public class OperatingGui : MonoBehaviour
     // public Button hostButton;
     // public Button serverButton;
     // public Button disconnectButton;
+    public Text scoreText;
 
     public GameObject initPanel;
     public GameObject gamingPanel;

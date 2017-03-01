@@ -1,15 +1,24 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
 
 public class GameController : NetworkBehaviour
 {
+    struct ScoreStruct
+    {
+        public string Nickname { get; set; }
+        public float AliveTime { get; set; }
+    }
+
     // Singleton.
     public static GameController Instance { get; private set; }
 
     private Dictionary<uint, Fighter> fighterDict = new Dictionary<uint, Fighter>();
+    private Dictionary<string, float> topScoreDict = new Dictionary<string, float>();
+    private List<ScoreStruct> topScoreList = new List<ScoreStruct>();
     private ResourceManager resourceManager;
 
     private float updateRankCountDown;
@@ -43,6 +52,31 @@ public class GameController : NetworkBehaviour
         if (updateRankCountDown <= 0)
         {
             updateRankCountDown = 0.5f;
+
+            // Update everyone's highest score.
+            foreach (var fighter in fighterDict.Values)
+            {
+                if (topScoreDict.ContainsKey(fighter.nickname))
+                {
+                    float highest = topScoreDict[fighter.nickname];
+                    if (fighter.AliveTime > highest)
+                    {
+                        topScoreDict[fighter.nickname] = fighter.AliveTime;
+                    }
+                }
+                else
+                {
+                    topScoreDict.Add(fighter.nickname, fighter.AliveTime);
+                }
+            }
+
+            topScoreList.Clear();
+            foreach (var score in topScoreDict)
+            {
+                topScoreList.Add(new ScoreStruct { Nickname = score.Key, AliveTime = score.Value });
+            }
+            topScoreList.Sort((a, b) => { return (int)(-(a.AliveTime - b.AliveTime) * 10); });
+
             UpdateRank();
         }
     }
@@ -50,13 +84,27 @@ public class GameController : NetworkBehaviour
     [Server]
     private void UpdateRank()
     {
-        // Update rank.
+        var stringBuilder = new StringBuilder();
+
+        // Find the top 5 scores.
+        int total = 0;
+        for (int i = 0; i < topScoreList.Count; i++)
+        {
+            stringBuilder.AppendFormat("{0}: {1:0.0}", topScoreList[i].Nickname, topScoreList[i].AliveTime).Append("\n");
+            total++;
+            if (total >= 5)
+            {
+                break;
+            }
+        }
+
+        RpcUpdateRank(stringBuilder.ToString());
     }
 
     [ClientRpc]
-    private void RpcUpdateRank(uint[] fighterIds)
+    private void RpcUpdateRank(string result)
     {
-
+        OperatingGui.Instance.scoreText.text = result;
     }
 
     [Server]
