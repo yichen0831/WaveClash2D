@@ -25,6 +25,7 @@ public class OperatingGui : MonoBehaviour
     // public Button hostButton;
     // public Button serverButton;
     // public Button disconnectButton;
+    public Button resetScoreButton;
     public Text scoreText;
 
     public GameObject initPanel;
@@ -62,6 +63,7 @@ public class OperatingGui : MonoBehaviour
             networkManager.StartClient();
             SwitchPanel(Gaming);
         }
+        resetScoreButton.gameObject.SetActive(false);
     }
 
     public void StartHost()
@@ -69,6 +71,7 @@ public class OperatingGui : MonoBehaviour
         networkType = NetworkType.Host;
         networkManager.StartHost();
         SwitchPanel(Gaming);
+        resetScoreButton.gameObject.SetActive(true);
     }
 
     public void StartServer()
@@ -76,6 +79,7 @@ public class OperatingGui : MonoBehaviour
         networkType = NetworkType.Server;
         networkManager.StartServer();
         SwitchPanel(Gaming);
+        resetScoreButton.gameObject.SetActive(true);
     }
 
     public void Disconnect()
@@ -119,6 +123,11 @@ public class OperatingGui : MonoBehaviour
     public int GetFighterIndex()
     {
         return fighterDropdown.value;
+    }
+
+    public void ResetScore()
+    {
+        GameController.Instance.ResetScore();
     }
 
 }

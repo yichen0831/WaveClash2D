@@ -35,8 +35,10 @@ public class Fighter : NetworkBehaviour
     [SyncVar]
     private Status currentStatus;
 
-    public float AliveTime { get; private set; }     // Alive time calculated on the server.
+    [SyncVar]
+    private float aliveTimeOnServer;
     private float aliveTimeUpdatCountDown;
+    public float AliveTime { get; private set; }     // Alive time calculated on the server.
 
     private Rigidbody2D rb;
     private Collider2D myCollider;
@@ -102,7 +104,7 @@ public class Fighter : NetworkBehaviour
             if (aliveTimeUpdatCountDown <= 0)
             {
                 aliveTimeUpdatCountDown = 0.1f;
-                RpcUpdateAliveTime(AliveTime);
+                aliveTimeOnServer = AliveTime;
             }
 
             // Check if the player who controls is disconnected.
@@ -190,6 +192,8 @@ public class Fighter : NetworkBehaviour
                     break;
             }
         }
+
+        UpdateAliveTime();
 
         // Animations.
         if (currentStatus != Status.Fall)
@@ -358,12 +362,11 @@ public class Fighter : NetworkBehaviour
 
     }
 
-    [ClientRpc]
-    private void RpcUpdateAliveTime(float aliveTime)
+    private void UpdateAliveTime()
     {
         // Update alive time on the GUI.
         var stringBuilder = new StringBuilder();
-        stringBuilder.AppendFormat("{0:0.0}", aliveTime);
+        stringBuilder.AppendFormat("{0:0.0}", aliveTimeOnServer);
         aliveText.text = stringBuilder.ToString();
     }
 

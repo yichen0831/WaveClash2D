@@ -51,7 +51,7 @@ public class GameController : NetworkBehaviour
         updateRankCountDown -= Time.deltaTime;
         if (updateRankCountDown <= 0)
         {
-            updateRankCountDown = 0.5f;
+            updateRankCountDown = 0.15f;
 
             // Update everyone's highest score.
             foreach (var fighter in fighterDict.Values)
@@ -77,12 +77,12 @@ public class GameController : NetworkBehaviour
             }
             topScoreList.Sort((a, b) => { return (int)(-(a.AliveTime - b.AliveTime) * 10); });
 
-            UpdateRank();
+            UpdateScore();
         }
     }
 
     [Server]
-    private void UpdateRank()
+    private void UpdateScore()
     {
         var stringBuilder = new StringBuilder();
 
@@ -98,13 +98,25 @@ public class GameController : NetworkBehaviour
             }
         }
 
-        RpcUpdateRank(stringBuilder.ToString());
+        ShowScore(stringBuilder.ToString());
+
+        RpcUpdateScore(stringBuilder.ToString());
     }
 
     [ClientRpc]
-    private void RpcUpdateRank(string result)
+    private void RpcUpdateScore(string result)
     {
-        OperatingGui.Instance.scoreText.text = result;
+        if (isServer)
+        {
+            return;
+        }
+
+        ShowScore(result);
+    }
+
+    private void ShowScore(string score)
+    {
+        OperatingGui.Instance.scoreText.text = score;
     }
 
     [Server]
@@ -134,5 +146,15 @@ public class GameController : NetworkBehaviour
         {
             fighterDict.Remove(id);
         }
+    }
+
+    public void ResetScore()
+    {
+        if (!isServer)
+        {
+            return;
+        }
+
+        topScoreDict.Clear();
     }
 }
